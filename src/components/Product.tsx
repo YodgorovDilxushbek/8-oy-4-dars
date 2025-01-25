@@ -9,8 +9,6 @@ interface Product {
     title: string;
     image: string;
     price: number;
-    category?: string;
-    company?: string;
   };
 }
 
@@ -19,22 +17,18 @@ interface FilterMeta {
   companies?: string[];
 }
 
-interface Pagination {
-  page: number;
-  pageCount: number;
-  total: number;
+interface Filters {
+  price: number;
+  search: string;
+  category: string;
+  company: string;
+  order: string;
 }
 
 const Product: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
-  const [filters, setFilters] = useState<{
-    price: number;
-    search: string;
-    category: string;
-    company: string;
-    order: string;
-  }>({
+  const [filters, setFilters] = useState<Filters>({
     price: 1000,
     search: "",
     category: "all",
@@ -42,46 +36,39 @@ const Product: React.FC = () => {
     order: "a-z",
   });
   const [filterMeta, setFilterMeta] = useState<FilterMeta>({});
-  const [pagination, setPagination] = useState<Pagination>({
-    page: 1,
-    pageCount: 1,
-    total: 0,
-  });
-
+  const [darkMode, setDarkMode] = useState<boolean>(
+    localStorage.getItem("theme") === "dark"
+  ); // Foydalanuvchi tanlovini saqlash
   const navigate = useNavigate();
 
   useEffect(() => {
     fetchProducts();
-  }, [pagination.page]);
+    // Dark/light rejimni classList yordamida qo'llash
+    document.documentElement.classList.toggle("dark", darkMode);
+    localStorage.setItem("theme", darkMode ? "dark" : "light");
+  }, [darkMode]);
 
   const fetchProducts = (query: string = "") => {
     setLoading(true);
     axios
-      .get(
-        `https://strapi-store-server.onrender.com/api/products?pagination[page]=${pagination.page}${query}`
-      )
+      .get(`https://strapi-store-server.onrender.com/api/products${query}`)
       .then((response) => {
         if (response.status === 200) {
           setProducts(response.data.data || []);
           setFilterMeta(response.data.meta || {});
-          setPagination({
-            page: response.data.meta.pagination.page,
-            pageCount: response.data.meta.pagination.pageCount,
-            total: response.data.meta.pagination.total,
-          });
         }
       })
       .catch((err) => console.error(err))
       .finally(() => setLoading(false));
   };
 
-  const handleFilterChange = (field: string, value: string | number) => {
+  const handleFilterChange = (field: keyof Filters, value: string | number) => {
     setFilters((prev) => ({ ...prev, [field]: value }));
   };
 
   const handleSearch = (event: React.FormEvent) => {
     event.preventDefault();
-    const query = `&filters[search]=${filters.search}&filters[category]=${filters.category}&filters[company]=${filters.company}&filters[order]=${filters.order}&filters[price_lte]=${filters.price}`;
+    const query = `?search=${filters.search}&category=${filters.category}&company=${filters.company}&order=${filters.order}&price_lte=${filters.price}`;
     fetchProducts(query);
   };
 
@@ -93,7 +80,6 @@ const Product: React.FC = () => {
       company: "all",
       order: "a-z",
     });
-    setPagination((prev) => ({ ...prev, page: 1 }));
     fetchProducts();
   };
 
@@ -103,69 +89,75 @@ const Product: React.FC = () => {
     }
   };
 
-  const handlePageChange = (newPage: number) => {
-    setPagination((prev) => ({ ...prev, page: newPage }));
-  };
-
   return (
-    <div className="p-6 bg-[#181920] min-h-screen text-white">
+    <div className={`min-h-screen ${darkMode ? "bg-gray-900 text-white" : "bg-white text-black"}`}>
+      <header className="w-full p-4 flex justify-between items-center">
+        <h1 className="text-2xl font-bold">Product List</h1>
+        <button
+          onClick={() => setDarkMode(!darkMode)}
+          className="px-4 py-2 rounded-lg bg-gray-300 dark:bg-gray-800 text-black dark:text-white hover:opacity-80 transition"
+        >
+          {darkMode ? "Light Mode" : "Dark Mode"}
+        </button>
+      </header>
+
       <form
         onSubmit={handleSearch}
-        className="max-w-[1100px] w-full mx-auto my-[50px] flex flex-col gap-[30px] p-[30px] bg-[#272935] rounded-lg"
+        className="max-w-[1100px] w-full mx-auto my-[50px] flex flex-col gap-[30px] p-[30px] bg-gray-200 dark:bg-gray-800 rounded-lg"
       >
         <div className="flex justify-between gap-[20px]">
-          <label className="flex flex-col w-[23%] gap-[7px] text-[#f8f8f8] text-[16px]" htmlFor="product">
+          <label className="flex flex-col w-[23%] gap-[7px] text-[16px]" htmlFor="product">
             Search Product
             <input
               id="product"
               value={filters.search}
               onChange={(e) => handleFilterChange("search", e.target.value)}
-              className="bg-[#272935] border border-[#767575] text-[#f8f8f8] rounded-lg py-[5px] px-3 focus:outline-none focus:ring-2 focus:ring-[#f06292]"
+              className="bg-gray-100 dark:bg-gray-700 border border-gray-400 dark:border-gray-600 rounded-lg py-[5px] px-3 focus:outline-none focus:ring-2 focus:ring-pink-400"
               type="text"
             />
           </label>
 
-          <label className="flex flex-col w-[23%] gap-[7px] text-[#f8f8f8] text-[16px]">
+          <label className="flex flex-col w-[23%] gap-[7px] text-[16px]">
             Select Category
             <select
               value={filters.category}
               onChange={(e) => handleFilterChange("category", e.target.value)}
-              className="bg-[#272935] border border-[#767575] text-[#f8f8f8] rounded-lg py-[5px] px-3 focus:outline-none focus:ring-2 focus:ring-[#f06292]"
+              className="bg-gray-100 dark:bg-gray-700 border border-gray-400 dark:border-gray-600 rounded-lg py-[5px] px-3 focus:outline-none focus:ring-2 focus:ring-pink-400"
             >
               <option value="all">All</option>
-              {filterMeta.categories?.map((category) => (
-                <option key={category} value={category}>
+              {filterMeta.categories?.map((category, index) => (
+                <option key={index} value={category}>
                   {category}
                 </option>
               ))}
             </select>
           </label>
 
-          <label className="flex flex-col w-[23%] gap-[7px] text-[#f8f8f8] text-[16px]">
+          <label className="flex flex-col w-[23%] gap-[7px] text-[16px]">
             Select Company
             <select
               value={filters.company}
               onChange={(e) => handleFilterChange("company", e.target.value)}
-              className="bg-[#272935] border border-[#767575] text-[#f8f8f8] rounded-lg py-[5px] px-3 focus:outline-none focus:ring-2 focus:ring-[#f06292]"
+              className="bg-gray-100 dark:bg-gray-700 border border-gray-400 dark:border-gray-600 rounded-lg py-[5px] px-3 focus:outline-none focus:ring-2 focus:ring-pink-400"
             >
               <option value="all">All</option>
-              {filterMeta.companies?.map((company) => (
-                <option key={company} value={company}>
+              {filterMeta.companies?.map((company, index) => (
+                <option key={index} value={company}>
                   {company}
                 </option>
               ))}
             </select>
           </label>
 
-          <label className="flex flex-col w-[23%] gap-[7px] text-[#f8f8f8] text-[16px]">
+          <label className="flex flex-col w-[23%] gap-[7px] text-[16px]">
             Sort By
             <select
               value={filters.order}
               onChange={(e) => handleFilterChange("order", e.target.value)}
-              className="bg-[#272935] border border-[#767575] text-[#f8f8f8] rounded-lg py-[5px] px-3 focus:outline-none focus:ring-2 focus:ring-[#f06292]"
+              className="bg-gray-100 dark:bg-gray-700 border border-gray-400 dark:border-gray-600 rounded-lg py-[5px] px-3 focus:outline-none focus:ring-2 focus:ring-pink-400"
             >
-              <option value="a-z">A-Z</option>
-              <option value="z-a">Z-A</option>
+              <option value="a-z">a-z</option>
+              <option value="z-a">z-a</option>
               <option value="high">High Price</option>
               <option value="low">Low Price</option>
             </select>
@@ -173,7 +165,7 @@ const Product: React.FC = () => {
         </div>
 
         <div className="flex justify-between items-center gap-[20px]">
-          <div className="flex flex-col gap-3 max-w-[240px] w-full text-[#f8f8f8] font-medium">
+          <div className="flex flex-col gap-3 max-w-[240px] w-full">
             <label htmlFor="price" className="flex justify-between items-center">
               <span>Select Price</span>
               <span>${filters.price.toFixed(2)}</span>
@@ -191,7 +183,7 @@ const Product: React.FC = () => {
 
           <button
             type="submit"
-            className="max-w-[230px] w-full px-6 py-[6px] bg-[#f06292] text-[#1b1c21] font-semibold rounded-lg hover:opacity-80 transition"
+            className="px-6 py-2 bg-pink-500 text-white rounded-lg hover:opacity-80 transition"
           >
             SEARCH
           </button>
@@ -199,7 +191,7 @@ const Product: React.FC = () => {
           <button
             type="button"
             onClick={handleReset}
-            className="max-w-[230px] w-full px-6 py-[6px] bg-[#ffa726] text-[#1b1c21] font-semibold rounded-lg hover:opacity-80 transition"
+            className="px-6 py-2 bg-yellow-500 text-black rounded-lg hover:opacity-80 transition"
           >
             RESET
           </button>
@@ -213,13 +205,13 @@ const Product: React.FC = () => {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 max-w-[1100px] w-full mx-auto py-12">
           {products.length === 0 ? (
-            <p className="text-2xl text-center text-[#f8f8f8]">No products found.</p>
+            <p className="text-2xl text-center">No products found.</p>
           ) : (
             products.map((product) => (
               <div
                 key={product.id}
                 onClick={() => handleRedirect(product)}
-                className="text-[#F8F8F2] shadow-xl hover:shadow-2xl transition cursor-pointer p-4 rounded-2xl"
+                className="shadow-xl hover:shadow-2xl transition cursor-pointer p-4 rounded-2xl"
               >
                 <img
                   src={product.attributes.image}
@@ -227,36 +219,16 @@ const Product: React.FC = () => {
                   className="rounded-xl h-64 w-full object-cover"
                 />
                 <div className="text-center mt-4">
-                  <h3 className="capitalize font-medium text-gray-400 text-lg">
+                  <h3 className="capitalize font-medium text-lg">
                     {product.attributes.title}
                   </h3>
-                  <p className="text-[#846eaa]">${product.attributes.price}</p>
+                  <p className="text-pink-400">${product.attributes.price}</p>
                 </div>
               </div>
             ))
           )}
         </div>
       )}
-
-      <div className="flex justify-center mt-6">
-        <button
-          disabled={pagination.page === 1}
-          onClick={() => handlePageChange(pagination.page - 1)}
-          className="px-4 py-2 bg-[#272935] rounded-lg mx-2 hover:opacity-80 transition"
-        >
-          Previous
-        </button>
-        <span className="px-4 py-2 bg-[#181920] rounded-lg">
-          Page {pagination.page} of {pagination.pageCount}
-        </span>
-        <button
-          disabled={pagination.page === pagination.pageCount}
-          onClick={() => handlePageChange(pagination.page + 1)}
-          className="px-4 py-2 bg-[#272935] rounded-lg mx-2 hover:opacity-80 transition"
-        >
-          Next
-        </button>
-      </div>
     </div>
   );
 };
